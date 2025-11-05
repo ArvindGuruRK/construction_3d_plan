@@ -1,5 +1,9 @@
 "use client";
 
+import * as React from "react";
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import * as THREE from 'three';
+
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Share2 } from "lucide-react";
@@ -16,12 +20,47 @@ interface ModelCardProps {
 
 export function ModelCard({ title, description, planConfig }: ModelCardProps) {
   const { toast } = useToast();
+  const [regenerationKey, setRegenerationKey] = React.useState(0);
+  const sceneRef = React.useRef<THREE.Scene | null>(null);
 
   const handleDownload = () => {
-    toast({
-      title: "Download Not Implemented",
-      description: "Downloading .glb files will be available soon.",
-    });
+    if (!sceneRef.current) {
+       toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: "The 3D model is not available for download.",
+      });
+      return;
+    }
+
+    const exporter = new GLTFExporter();
+    exporter.parse(
+      sceneRef.current,
+      (gltf) => {
+        const blob = new Blob([JSON.stringify(gltf)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'floor-plan.gltf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Download Started",
+          description: "Your model is being downloaded as floor-plan.gltf",
+        });
+      },
+      (error) => {
+         toast({
+          variant: "destructive",
+          title: "Download Error",
+          description: "An error occurred while exporting the model.",
+        });
+        console.error('An error occurred during GLTF export:', error);
+      }
+    );
   };
 
   const handleShare = () => {
@@ -33,9 +72,10 @@ export function ModelCard({ title, description, planConfig }: ModelCardProps) {
   };
   
   const handleRegenerate = () => {
+    setRegenerationKey(prev => prev + 1);
     toast({
-      title: "Not Implemented",
-      description: "This feature will be available in a future update.",
+      title: "Model Regenerated",
+      description: "A new layout variation has been created.",
     });
   };
 
@@ -48,7 +88,11 @@ export function ModelCard({ title, description, planConfig }: ModelCardProps) {
       <CardContent className="flex-grow p-0">
         <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
           {planConfig ? (
-            <InteractiveViewer planConfig={planConfig} />
+            <InteractiveViewer 
+              planConfig={planConfig} 
+              regenerationKey={regenerationKey}
+              onSceneReady={(scene) => sceneRef.current = scene}
+            />
           ) : (
              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                 <p className="text-gray-500">No plan to display</p>

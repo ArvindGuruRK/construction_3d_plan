@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { GeneratePlanSchema } from '@/lib/schemas';
@@ -131,9 +131,14 @@ function generateLayout(planConfig: GeneratePlanSchema) {
 
 // --- MAIN 3D COMPONENT ---
 
-const FloorPlan = ({ planConfig }: { planConfig: GeneratePlanSchema }) => {
+const FloorPlan = ({ planConfig, onSceneReady }: { planConfig: GeneratePlanSchema, onSceneReady: (scene: THREE.Scene) => void; }) => {
+  const { scene } = useThree();
   const { rooms, walls } = React.useMemo(() => generateLayout(planConfig), [planConfig]);
   const sideLength = Math.sqrt(planConfig.totalArea);
+
+  React.useEffect(() => {
+    onSceneReady(scene);
+  }, [scene, onSceneReady]);
 
   return (
     <group position={[-sideLength / 2, 0, -sideLength / 2]}>
@@ -189,9 +194,11 @@ const FloorPlan = ({ planConfig }: { planConfig: GeneratePlanSchema }) => {
 
 interface InteractiveViewerProps {
   planConfig: GeneratePlanSchema;
+  regenerationKey: number;
+  onSceneReady: (scene: THREE.Scene) => void;
 }
 
-export function InteractiveViewer({ planConfig }: InteractiveViewerProps) {
+export function InteractiveViewer({ planConfig, regenerationKey, onSceneReady }: InteractiveViewerProps) {
   const totalArea = planConfig.totalArea;
   const cameraDistance = Math.sqrt(totalArea) * 1.5;
 
@@ -209,7 +216,7 @@ export function InteractiveViewer({ planConfig }: InteractiveViewerProps) {
       />
       
       <React.Suspense fallback={null}>
-        <FloorPlan planConfig={planConfig} />
+        <FloorPlan key={regenerationKey} planConfig={planConfig} onSceneReady={onSceneReady} />
       </React.Suspense>
       
       <OrbitControls 
