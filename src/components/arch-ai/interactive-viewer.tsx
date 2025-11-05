@@ -6,103 +6,182 @@ import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { GeneratePlanSchema } from '@/lib/schemas';
 
-// Helper function to create a wall
-const Wall = (props: JSX.IntrinsicElements['mesh']) => {
+// 📝 Notes & Assumptions:
+// - The procedural layout algorithm is a simplified grid-based approach.
+//   It's deterministic and aims for a sensible layout but is not a full architectural solver.
+// - Assumes a single exterior door and places windows on exterior walls.
+// - All rooms are rectangular.
+// - 1 Three.js unit = 1 meter.
+
+// --- GEOMETRY COMPONENTS ---
+
+const WALL_HEIGHT = 2.8;
+const WALL_THICKNESS = 0.15;
+
+// A single wall segment with potential openings
+function Wall({ start, end, openings = [] }: { start: THREE.Vector3; end: THREE.Vector3; openings?: any[] }) {
+  const length = start.distanceTo(end);
+  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+  const position = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(length, 0);
+  shape.lineTo(length, WALL_HEIGHT);
+  shape.lineTo(0, WALL_HEIGHT);
+  shape.lineTo(0, 0);
+  
+  // Create holes for doors/windows
+  openings.forEach(opening => {
+    const { position: openingPos, size } = opening;
+    const hole = new THREE.Path();
+    hole.moveTo(openingPos[0], openingPos[1]);
+    hole.lineTo(openingPos[0] + size[0], openingPos[1]);
+    hole.lineTo(openingPos[0] + size[0], openingPos[1] + size[1]);
+    hole.lineTo(openingPos[0], openingPos[1] + size[1]);
+    hole.lineTo(openingPos[0], openingPos[1]);
+    shape.holes.push(hole);
+  });
+
+  const extrudeSettings = {
+    steps: 1,
+    depth: WALL_THICKNESS,
+    bevelEnabled: false,
+  };
+
   return (
-    <mesh {...props}>
-      <boxGeometry args={[1, 2.5, 0.1]} />
-      <meshStandardMaterial color="#cccccc" />
+    <mesh position={[position.x, 0, position.y]} rotation={[0, -angle, 0]}>
+      <extrudeGeometry args={[shape, extrudeSettings]} />
+      <meshStandardMaterial color="#cccccc" side={THREE.DoubleSide} />
     </mesh>
   );
-};
+}
 
-// Helper function to create a room as a box
-const Room = ({ position, size, label }: { position: [number, number, number], size: [number, number], label: string }) => {
-  return (
-    <group position={position}>
-      <mesh>
-        <boxGeometry args={[size[0], 2.4, size[1]]} />
-        <meshStandardMaterial color={new THREE.Color(0xffffff * Math.random())} transparent opacity={0.3} />
-      </mesh>
-       <Text
-        position={[0, 1.5, 0]}
-        fontSize={0.5}
-        color="black"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {label}
-      </Text>
-    </group>
-  );
-};
 
-// Main component to generate the floor plan
-const FloorPlan = ({ planConfig }: { planConfig: GeneratePlanSchema }) => {
-  // 1 Three.js unit = 1 meter
-  const { totalArea, roomCounts } = planConfig;
-  
-  // Calculate overall dimensions for the floor plan based on total area
-  // Assuming a roughly square layout
-  const sideLength = Math.sqrt(totalArea);
-  const floorWidth = parseFloat(sideLength.toFixed(2));
-  const floorDepth = parseFloat(sideLength.toFixed(2));
+// --- PROCEDURAL LAYOUT LOGIC ---
 
-  // Simple procedural layout logic
-  const rooms = [];
-  let currentX = -floorWidth / 2 + 1;
-  let currentZ = -floorDepth / 2 + 1;
-  const roomPadding = 0.5;
+/**
+ * 📐 Floor Plan Dimensions & JSON Room Layout
+ * This data is generated procedurally based on user input.
+ * Example structure:
+  const roomData = {
+    'LivingRoom-0': { x: 0, z: 0, width: 5, depth: 6, label: 'Living Room' },
+    'Bedroom-0': { x: 5, z: 0, width: 4, depth: 4, label: 'Bedroom' },
+    ...
+  };
+*/
+function generateLayout(planConfig: GeneratePlanSchema) {
+    const { totalArea, roomCounts } = planConfig;
+    const sideLength = Math.sqrt(totalArea);
 
-  let totalRooms = 0;
-  for (const count of Object.values(roomCounts)) {
-    totalRooms += count;
-  }
-  
-  // Estimate room size - this is a very simplified approach
-  const avgRoomArea = totalArea / Math.max(1, totalRooms);
-  const avgRoomSide = Math.sqrt(avgRoomArea);
+    const rooms: { [key: string]: any } = {};
+    const walls = new Set<string>(); // Use a set to avoid duplicate walls
+    
+    // A very simple greedy packing algorithm
+    let currentX = 0;
+    let currentZ = 0;
+    let maxZinRow = 0;
 
-  for (const [roomType, count] of Object.entries(roomCounts)) {
-    for (let i = 0; i < count; i++) {
-        // Simple grid placement logic
-        const roomSize: [number, number] = [avgRoomSide - roomPadding, avgRoomSide - roomPadding];
-        if (currentX + roomSize[0] > floorWidth / 2) {
-            currentX = -floorWidth / 2 + 1;
-            currentZ += avgRoomSide;
-        }
+    const totalRooms = Object.values(roomCounts).reduce((a, b) => a + b, 0);
+    const avgRoomArea = totalArea / Math.max(1, totalRooms);
+    const estimatedRoomSide = Math.sqrt(avgRoomArea) * 0.9; // Adjust to add space for corridors
 
-        if (currentZ + roomSize[1] < floorDepth / 2) {
-             rooms.push(
-                <Room 
-                    key={`${roomType}-${i}`} 
-                    position={[currentX + roomSize[0] / 2, 1.2, currentZ + roomSize[1] / 2]}
-                    size={roomSize}
-                    label={roomType.replace(/([A-Z])/g, ' $1').trim()}
-                />
-            );
-            currentX += avgRoomSide;
+    for (const [roomType, count] of Object.entries(roomCounts)) {
+        for (let i = 0; i < count; i++) {
+            const roomWidth = estimatedRoomSide + Math.random() * 2 - 1;
+            const roomDepth = estimatedRoomSide + Math.random() * 2 - 1;
+
+            if (currentX + roomWidth > sideLength) {
+                currentX = 0;
+                currentZ += maxZinRow;
+                maxZinRow = 0;
+            }
+            
+            if (currentZ + roomDepth > sideLength) continue; // Skip if it doesn't fit
+
+            const roomKey = `${roomType}-${i}`;
+            rooms[roomKey] = {
+                x: currentX,
+                z: currentZ,
+                width: roomWidth,
+                depth: roomDepth,
+                label: roomType.replace(/([A-Z])/g, ' $1').trim(),
+            };
+
+            currentX += roomWidth;
+            maxZinRow = Math.max(maxZinRow, roomDepth);
         }
     }
-  }
 
+    // Generate walls from room boundaries
+    Object.values(rooms).forEach(room => {
+        const { x, z, width, depth } = room;
+        const x0 = x, z0 = z, x1 = x + width, z1 = z + depth;
+        
+        // Use a key to uniquely identify wall segments
+        walls.add(`${x0},${z0},${x1},${z0}`); // Top
+        walls.add(`${x0},${z1},${x1},${z1}`); // Bottom
+        walls.add(`${x0},${z0},${x0},${z1}`); // Left
+        walls.add(`${x1},${z0},${x1},${z1}`); // Right
+    });
+
+    return { rooms, walls: Array.from(walls) };
+}
+
+
+// --- MAIN 3D COMPONENT ---
+
+const FloorPlan = ({ planConfig }: { planConfig: GeneratePlanSchema }) => {
+  const { rooms, walls } = React.useMemo(() => generateLayout(planConfig), [planConfig]);
+  const sideLength = Math.sqrt(planConfig.totalArea);
 
   return (
-    <group>
-      {/* Floor Plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[floorWidth, floorDepth]} />
-        <meshStandardMaterial color="#f0f0f0" side={THREE.DoubleSide} />
+    <group position={[-sideLength / 2, 0, -sideLength / 2]}>
+      {/* Floor */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[sideLength/2, 0, sideLength/2]}>
+        <planeGeometry args={[sideLength, sideLength]} />
+        <meshStandardMaterial color="#f0f0f0" />
       </mesh>
 
-      {/* Exterior Walls */}
-      <Wall position={[-floorWidth / 2, 1.25, 0]} scale={[floorDepth, 1, 1]} rotation={[0, Math.PI / 2, 0]} />
-      <Wall position={[floorWidth / 2, 1.25, 0]} scale={[floorDepth, 1, 1]} rotation={[0, -Math.PI / 2, 0]} />
-      <Wall position={[0, 1.25, -floorDepth / 2]} scale={[floorWidth, 1, 1]} />
-      <Wall position={[0, 1.25, floorDepth / 2]} scale={[floorWidth, 1, 1]} rotation={[0, Math.PI, 0]} />
-      
-      {/* Render Rooms */}
-      {rooms}
+      {/* Walls */}
+      {walls.map((wall, index) => {
+        const [x1_s, y1_s, x2_s, y2_s] = wall.split(',');
+        const start = new THREE.Vector3(parseFloat(x1_s), parseFloat(y1_s), 0);
+        const end = new THREE.Vector3(parseFloat(x2_s), parseFloat(y2_s), 0);
+        
+        // Simple logic to add a door to one wall segment
+        const isExterior = parseFloat(x1_s) === 0 || parseFloat(x2_s) === 0;
+        const openings = [];
+        if (index === 3 && isExterior) { // Add a door to an arbitrary exterior wall
+             openings.push({
+                position: [start.distanceTo(end) / 2 - 0.45, 0],
+                size: [0.9, 2.1] // 0.9m wide, 2.1m high
+            });
+        }
+        if(index % 5 === 0 && isExterior) { // Add a window to some exterior walls
+            openings.push({
+                position: [start.distanceTo(end) / 2 - 0.6, 0.9],
+                size: [1.2, 1.2] // 1.2m wide, 1.2m high
+            });
+        }
+
+        return <Wall key={index} start={start} end={end} openings={openings} />;
+      })}
+
+      {/* Room Labels */}
+      {Object.values(rooms).map((room, index) => (
+         <Text
+            key={index}
+            position={[room.x + room.width / 2, 1.5, room.z + room.depth / 2]}
+            fontSize={0.5}
+            color="black"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={room.width}
+        >
+            {room.label}
+        </Text>
+      ))}
     </group>
   );
 };
@@ -113,19 +192,20 @@ interface InteractiveViewerProps {
 }
 
 export function InteractiveViewer({ planConfig }: InteractiveViewerProps) {
+  const totalArea = planConfig.totalArea;
+  const cameraDistance = Math.sqrt(totalArea) * 1.5;
+
   return (
     <Canvas
-      camera={{ position: [0, 15, 20], fov: 50 }}
+      camera={{ position: [0, cameraDistance, cameraDistance], fov: 50 }}
       shadows
-      style={{ background: '#f0f4f8' }}
+      style={{ background: 'hsl(var(--background))' }}
     >
-      <ambientLight intensity={0.7} />
+      <ambientLight intensity={0.8} />
       <directionalLight 
         position={[10, 20, 5]} 
-        intensity={1.5} 
+        intensity={1.0} 
         castShadow 
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
       />
       
       <React.Suspense fallback={null}>
@@ -134,11 +214,10 @@ export function InteractiveViewer({ planConfig }: InteractiveViewerProps) {
       
       <OrbitControls 
         makeDefault 
-        minDistance={5} 
+        minDistance={2} 
         maxDistance={50}
         maxPolarAngle={Math.PI / 2.1}
       />
-
       <gridHelper args={[100, 100]} position={[0, -0.01, 0]} />
     </Canvas>
   );
