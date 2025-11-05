@@ -52,7 +52,7 @@ function Wall({ start, end, openings = [] }: { start: THREE.Vector3; end: THREE.
   return (
     <mesh position={[position.x, 0, position.y]} rotation={[0, -angle, 0]}>
       <extrudeGeometry args={[shape, extrudeSettings]} />
-      <meshStandardMaterial color="#cccccc" side={THREE.DoubleSide} />
+      <meshStandardMaterial color="#f8f8f8" side={THREE.DoubleSide} />
     </mesh>
   );
 }
@@ -145,7 +145,7 @@ const FloorPlan = ({ planConfig, onSceneReady }: { planConfig: GeneratePlanSchem
       {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[sideLength/2, 0, sideLength/2]}>
         <planeGeometry args={[sideLength, sideLength]} />
-        <meshStandardMaterial color="#f0f0f0" />
+        <meshStandardMaterial color="#d2b48c" />
       </mesh>
 
       {/* Walls */}
