@@ -1,0 +1,28 @@
+{
+  "placeholderImages": [
+    {
+      "id": "floor-plan-1",
+      "description": "First variation of the generated floor plan.",
+      "imageUrl": "https://images.unsplash.com/photo-1721244654210-a505a99661e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxmbG9vciUyMHBsYW58ZW58MHx8fHwxNzYxOTIwMzY4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "floor plan"
+    },
+    {
+      "id": "floor-plan-2",
+      "description": "Second variation of the generated floor plan.",
+      "imageUrl": "https://images.unsplash.com/photo-1542621334-a254cf47733d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxhcmNoaXRlY3R1cmFsJTIwZHJhd2luZ3xlbnwwfHx8fDE3NjE5OTAyNDB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "architectural drawing"
+    },
+    {
+      "id": "floor-plan-3",
+      "description": "Third variation of the generated floor plan.",
+      "imageUrl": "https://images.unsplash.com/photo-1599420187429-774dbfc6ba5d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxob3VzZSUyMHBsYW58ZW58MHx8fHwxNzYxOTA4NzM0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "house plan"
+    },
+    {
+      "id": "floor-plan-4",
+      "description": "Fourth variation of the generated floor plan.",
+      "imageUrl": "https://images.unsplash.com/photo-1618220179428-22790b461013?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxpbnRlcmlvciUyMGRlc2lnbnxlbnwwfHx8fDE3NjE5OTAyNDB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "interior design"
+    }
+  ]
+}
