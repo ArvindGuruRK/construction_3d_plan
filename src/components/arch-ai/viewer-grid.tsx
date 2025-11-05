@@ -4,10 +4,13 @@ import { ModelCard } from "./model-card";
 import type { ImagePlaceholder } from "@/lib/placeholder-images";
 import { LayoutTemplate, Loader } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import type { GeneratePlanSchema } from "@/lib/schemas";
+
 
 interface ViewerGridProps {
   isLoading: boolean;
   results: ImagePlaceholder[];
+  formData: GeneratePlanSchema | null;
 }
 
 function EmptyState() {
@@ -40,7 +43,7 @@ function LoadingState() {
   );
 }
 
-export function ViewerGrid({ isLoading, results }: ViewerGridProps) {
+export function ViewerGrid({ isLoading, results, formData }: ViewerGridProps) {
   if (isLoading) {
     return <LoadingState />;
   }
@@ -56,9 +59,8 @@ export function ViewerGrid({ isLoading, results }: ViewerGridProps) {
           <ModelCard
             key={result.id}
             title={`Variation ${index + 1}`}
-            imageUrl={result.imageUrl}
-            imageHint={result.imageHint}
             description={result.description}
+            planConfig={formData}
           />
         ))}
       </div>

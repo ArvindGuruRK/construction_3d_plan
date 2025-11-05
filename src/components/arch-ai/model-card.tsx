@@ -1,32 +1,26 @@
 "use client";
 
-import Image from "next/image";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { InteractiveViewer } from "./interactive-viewer";
+import type { GeneratePlanSchema } from "@/lib/schemas";
+
 
 interface ModelCardProps {
   title: string;
-  imageUrl: string;
-  imageHint: string;
   description: string;
+  planConfig: GeneratePlanSchema | null;
 }
 
-export function ModelCard({ title, imageUrl, imageHint, description }: ModelCardProps) {
+export function ModelCard({ title, description, planConfig }: ModelCardProps) {
   const { toast } = useToast();
 
   const handleDownload = () => {
-    const a = document.createElement("a");
-    a.href = imageUrl;
-    a.download = `${title.replace(/\s/g, "_").toLowerCase()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
     toast({
-      title: "Download Started",
-      description: `Downloading ${a.download}`,
+      title: "Download Not Implemented",
+      description: "Downloading .glb files will be available soon.",
     });
   };
 
@@ -51,16 +45,15 @@ export function ModelCard({ title, imageUrl, imageHint, description }: ModelCard
         <CardTitle>{title}</CardTitle>
         <CardDescription className="line-clamp-3 h-[60px]">{description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex-grow">
+      <CardContent className="flex-grow p-0">
         <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
-          <Image
-            src={imageUrl}
-            alt={title}
-            width={600}
-            height={400}
-            data-ai-hint={imageHint}
-            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-          />
+          {planConfig ? (
+            <InteractiveViewer planConfig={planConfig} />
+          ) : (
+             <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                <p className="text-gray-500">No plan to display</p>
+            </div>
+          )}
         </div>
       </CardContent>
       <CardFooter className="flex justify-end gap-2">

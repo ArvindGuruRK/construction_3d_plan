@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 export default function Home() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [results, setResults] = React.useState<ImagePlaceholder[]>([]);
+  const [formData, setFormData] = React.useState<GeneratePlanSchema | null>(null);
+
   const { toast } = useToast();
 
   const form = useForm<GeneratePlanSchema>({
@@ -37,6 +39,7 @@ export default function Home() {
   const onSubmit = async (data: GeneratePlanSchema) => {
     setIsLoading(true);
     setResults([]);
+    setFormData(data);
     try {
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -47,7 +50,7 @@ export default function Home() {
         toast({
           variant: "destructive",
           title: "Generation Failed",
-          description: response.error || "An unknown error occurred.",
+          description: "An unknown error occurred.",
         });
       }
     } catch (error) {
@@ -81,7 +84,7 @@ export default function Home() {
       </Sidebar>
       <SidebarInset>
         <main className="flex-1">
-          <ViewerGrid isLoading={isLoading} results={results} />
+          <ViewerGrid isLoading={isLoading} results={results} formData={formData} />
         </main>
       </SidebarInset>
     </SidebarProvider>
