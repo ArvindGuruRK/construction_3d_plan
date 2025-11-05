@@ -70,7 +70,7 @@ export default function Home() {
         <SidebarHeader className="p-4">
           <div className="flex items-center gap-2">
             <Logo className="size-8 text-primary" />
-            <h1 className="text-xl font-semibold font-headline">builderAI</h1>
+            <h1 className="text-xl font-semibold font-headline">Construction AI</h1>
           </div>
         </SidebarHeader>
         <SidebarContent className="p-0">

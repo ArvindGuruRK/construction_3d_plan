@@ -1,6 +1,6 @@
-# builderAI
+# Construction AI
 
-Welcome to builderAI, an AI-powered 3D floor plan generation tool. This application allows you to configure various parameters for a floor plan and generate multiple 3D variations using generative AI.
+Welcome to Construction AI, an AI-powered 3D floor plan generation tool. This application allows you to configure various parameters for a floor plan and generate multiple 3D variations using generative AI.
 
 ## Tech Stack
 
