@@ -10,7 +10,7 @@ import type { GeneratePlanSchema } from '@/lib/schemas';
 const Wall = (props: JSX.IntrinsicElements['mesh']) => {
   return (
     <mesh {...props}>
-      <boxGeometry args={[props.scale-x, 2.5, 0.1]} />
+      <boxGeometry args={[1, 2.5, 0.1]} />
       <meshStandardMaterial color="#cccccc" />
     </mesh>
   );
@@ -96,10 +96,10 @@ const FloorPlan = ({ planConfig }: { planConfig: GeneratePlanSchema }) => {
       </mesh>
 
       {/* Exterior Walls */}
-      <Wall position={[-floorWidth / 2, 1.25, 0]} scale-x={floorDepth} rotation={[0, Math.PI / 2, 0]} />
-      <Wall position={[floorWidth / 2, 1.25, 0]} scale-x={floorDepth} rotation={[0, -Math.PI / 2, 0]} />
-      <Wall position={[0, 1.25, -floorDepth / 2]} scale-x={floorWidth} />
-      <Wall position={[0, 1.25, floorDepth / 2]} scale-x={floorWidth} rotation={[0, Math.PI, 0]} />
+      <Wall position={[-floorWidth / 2, 1.25, 0]} scale={[floorDepth, 1, 1]} rotation={[0, Math.PI / 2, 0]} />
+      <Wall position={[floorWidth / 2, 1.25, 0]} scale={[floorDepth, 1, 1]} rotation={[0, -Math.PI / 2, 0]} />
+      <Wall position={[0, 1.25, -floorDepth / 2]} scale={[floorWidth, 1, 1]} />
+      <Wall position={[0, 1.25, floorDepth / 2]} scale={[floorWidth, 1, 1]} rotation={[0, Math.PI, 0]} />
       
       {/* Render Rooms */}
       {rooms}
