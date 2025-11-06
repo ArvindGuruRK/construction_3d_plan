@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [isLoading, setIsLoading] = React.useState(false);
-  const [results, setResults] = React.useState<ImagePlaceholder[]>([]);
+  const [result, setResult] = React.useState<ImagePlaceholder | null>(null);
   const [formData, setFormData] = React.useState<GeneratePlanSchema | null>(null);
 
   const { toast } = useToast();
@@ -25,27 +25,26 @@ export default function Home() {
   const form = useForm<GeneratePlanSchema>({
     resolver: zodResolver(generatePlanSchema),
     defaultValues: {
-      totalArea: 300,
+      totalArea: 1200,
       roomCounts: {
-        Bedroom: 1,
-        Bathroom: 1,
+        Bedroom: 2,
+        Bathroom: 2,
         Kitchen: 1,
         LivingRoom: 1,
-        DiningRoom: 1,
+        DiningRoom: 0,
       },
     },
   });
 
   const onSubmit = async (data: GeneratePlanSchema) => {
     setIsLoading(true);
-    setResults([]);
+    setResult(null);
     setFormData(data);
     try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
       const response = await getPlanVariations(data);
       if (response.success && response.data) {
-        setResults(response.data);
+        // We are now only focused on a single variation
+        setResult(response.data[0]);
       } else {
         toast({
           variant: "destructive",
@@ -70,7 +69,7 @@ export default function Home() {
         <SidebarHeader className="p-4">
           <div className="flex items-center gap-2">
             <Logo className="size-8 text-primary" />
-            <h1 className="text-xl font-semibold font-headline">Construction AI</h1>
+            <h1 className="text-xl font-semibold font-headline">ArchAI 3D</h1>
           </div>
         </SidebarHeader>
         <SidebarContent className="p-0">
@@ -78,13 +77,13 @@ export default function Home() {
         </SidebarContent>
         <SidebarFooter className="p-4 border-t">
            <Button variant="default" type="submit" form="config-form" disabled={isLoading} className="w-full">
-            Generate Plans
+            Generate Plan
           </Button>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <main className="flex-1">
-          <ViewerGrid isLoading={isLoading} results={results} formData={formData} />
+          <ViewerGrid isLoading={isLoading} result={result} formData={formData} />
         </main>
       </SidebarInset>
     </SidebarProvider>

@@ -9,7 +9,7 @@ import type { GeneratePlanSchema } from "@/lib/schemas";
 
 interface ViewerGridProps {
   isLoading: boolean;
-  results: ImagePlaceholder[];
+  result: ImagePlaceholder | null;
   formData: GeneratePlanSchema | null;
 }
 
@@ -21,7 +21,7 @@ function EmptyState() {
         <h2 className="mt-6 text-2xl font-semibold font-headline">Design Your Space</h2>
         <p className="mt-2 text-muted-foreground">
           Use the panel on the left to configure your requirements and click
-          "Generate Plans" to begin.
+          "Generate Plan" to begin.
         </p>
       </div>
     </div>
@@ -33,9 +33,9 @@ function LoadingState() {
     <div className="flex flex-col items-center justify-center h-full text-center p-8 grid-bg">
        <div className="bg-background/80 p-8 rounded-lg shadow-lg backdrop-blur-sm w-full max-w-md">
         <Loader className="mx-auto h-16 w-16 text-primary animate-spin" />
-        <h2 className="mt-6 text-2xl font-semibold font-headline">Generating Your Plans...</h2>
+        <h2 className="mt-6 text-2xl font-semibold font-headline">Generating Your Plan...</h2>
         <p className="mt-2 text-muted-foreground">
-          Our AI is working hard to create unique floor plans for you. This may take a moment.
+          Our AI is working hard to create a unique floor plan for you. This may take a moment.
         </p>
         <Progress value={50} className="mt-6 h-2 indeterminate-progress" />
       </div>
@@ -43,26 +43,24 @@ function LoadingState() {
   );
 }
 
-export function ViewerGrid({ isLoading, results, formData }: ViewerGridProps) {
+export function ViewerGrid({ isLoading, result, formData }: ViewerGridProps) {
   if (isLoading) {
     return <LoadingState />;
   }
 
-  if (results.length === 0) {
+  if (!result) {
     return <EmptyState />;
   }
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <div className="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
-        {results.map((result, index) => (
-          <ModelCard
+    <div className="p-4 sm:p-6 md:p-8 flex items-center justify-center h-full">
+      <div className="w-full max-w-4xl">
+        <ModelCard
             key={result.id}
-            title={`Variation ${index + 1}`}
+            title="Generated Floor Plan"
             description={result.description}
             planConfig={formData}
           />
-        ))}
       </div>
     </div>
   );
