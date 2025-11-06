@@ -369,14 +369,14 @@ class MeshGenerator {
 const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: GeneratePlanSchema, onSceneReady: (scene: THREE.Scene) => void; }) => {
   const { scene } = useThree();
 
-  const { model: generatedModel, layout } = React.useMemo(() => {
+  const { model: generatedModel, layout, centerOffset } = React.useMemo(() => {
     try {
       const layoutGenerator = new AdvancedLayoutGenerator(planConfig);
       const { layout, envelope } = layoutGenerator.generateLayout();
       
       if (!layout || layout.length === 0) {
         console.error("Layout generation failed to produce any rooms.");
-        return { model: new THREE.Group(), layout: [], envelope: { width: 10, depth: 10 } };
+        return { model: new THREE.Group(), layout: [], centerOffset: new THREE.Vector3() };
       }
 
       const meshGenerator = new MeshGenerator();
@@ -387,11 +387,11 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
       const center = box.getCenter(new THREE.Vector3());
       model.position.sub(center);
       
-      return { model, layout, envelope };
+      return { model, layout, centerOffset: center };
 
     } catch (error) {
       console.error("Error during 3D model generation:", error);
-      return { model: new THREE.Group(), layout: [], envelope: { width: 10, depth: 10 } }; // Return empty group on error
+      return { model: new THREE.Group(), layout: [], centerOffset: new THREE.Vector3() }; // Return empty group on error
     }
   }, [planConfig]);
 
@@ -416,14 +416,17 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
       {/* Room Labels */}
       {layout.map((room: any) => {
         const label = room.type.replace(/([A-Z])/g, ' $1').trim();
-        // Get model center to offset label position
-        const box = new THREE.Box3().setFromObject(generatedModel);
-        const center = box.getCenter(new THREE.Vector3());
-
+        const labelPosition = new THREE.Vector3(
+            room.x + room.width / 2,
+            1.5,
+            room.y + room.height / 2
+        );
+        labelPosition.sub(centerOffset);
+        
         return (
             <Text
             key={room.id}
-            position={[room.x + room.width / 2 - center.x, 1.5, room.y + room.height / 2 - center.z]}
+            position={labelPosition}
             fontSize={0.4}
             color="#333333"
             anchorX="center"
@@ -484,4 +487,3 @@ export function InteractiveViewer({ planConfig, regenerationKey, onSceneReady }:
     </Canvas>
   );
 }
-
