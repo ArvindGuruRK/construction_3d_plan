@@ -6,191 +6,436 @@ import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import type { GeneratePlanSchema } from '@/lib/schemas';
 
-// 📝 Notes & Assumptions:
-// - The procedural layout algorithm is a simplified grid-based approach.
-//   It's deterministic and aims for a sensible layout but is not a full architectural solver.
-// - Assumes a single exterior door and places windows on exterior walls.
-// - All rooms are rectangular.
-// - 1 Three.js unit = 1 meter.
 
-// --- GEOMETRY COMPONENTS ---
+// --- ARCHITECTURAL CONSTANTS (real-world scale) ---
+const METER_TO_FEET = 3.28084;
+const SQFT_TO_SQM = 0.092903;
 
-const WALL_HEIGHT = 2.8;
-const WALL_THICKNESS = 0.15;
+const WALL_HEIGHT = 2.7; // 2.7m ceiling height
+const INTERIOR_WALL_THICKNESS = 0.15; // 15cm
+const EXTERIOR_WALL_THICKNESS = 0.25; // 25cm
 
-// A single wall segment with potential openings
-function Wall({ start, end, openings = [] }: { start: THREE.Vector3; end: THREE.Vector3; openings?: any[] }) {
-  const length = start.distanceTo(end);
-  const angle = Math.atan2(end.y - start.y, end.x - start.x);
-  const position = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+const DOOR_WIDTH = 0.9; // 90cm
+const DOOR_HEIGHT = 2.1; // 2.1m
 
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0);
-  shape.lineTo(length, 0);
-  shape.lineTo(length, WALL_HEIGHT);
-  shape.lineTo(0, WALL_HEIGHT);
-  shape.lineTo(0, 0);
+const WINDOW_WIDTH = 1.5; // 1.5m
+const WINDOW_HEIGHT = 1.2; // 1.2m
+const WINDOW_SILL_HEIGHT = 0.9; // 90cm from floor
+
+// --- PROCEDURAL GENERATION ENGINE ---
+
+class AdvancedLayoutGenerator {
+  totalAreaMeters: number;
+  roomRequest: GeneratePlanSchema['roomCounts'];
+  gridSize = 0.5; // 50cm grid for snapping
+
+  constructor(planConfig: GeneratePlanSchema) {
+    this.totalAreaMeters = (planConfig.totalArea ?? 1200) * SQFT_TO_SQM;
+    this.roomRequest = planConfig.roomCounts;
+  }
   
-  // Create holes for doors/windows
-  openings.forEach(opening => {
-    const { position: openingPos, size } = opening;
-    const hole = new THREE.Path();
-    hole.moveTo(openingPos[0], openingPos[1]);
-    hole.lineTo(openingPos[0] + size[0], openingPos[1]);
-    hole.lineTo(openingPos[0] + size[0], openingPos[1] + size[1]);
-    hole.lineTo(openingPos[0], openingPos[1] + size[1]);
-    hole.lineTo(openingPos[0], openingPos[1]);
-    shape.holes.push(hole);
-  });
+  private snapToGrid(value: number) {
+    return Math.round(value / this.gridSize) * this.gridSize;
+  }
 
-  const extrudeSettings = {
-    steps: 1,
-    depth: WALL_THICKNESS,
-    bevelEnabled: false,
-  };
+  private getMinimumArea(roomType: keyof GeneratePlanSchema['roomCounts']) {
+    const minimums: Record<keyof GeneratePlanSchema['roomCounts'], number> = {
+      LivingRoom: 12,
+      Kitchen: 6,
+      Bedroom: 9,
+      Bathroom: 4,
+      DiningRoom: 9,
+    };
+    return minimums[roomType] || 0;
+  }
 
-  return (
-    <mesh position={[position.x, 0, position.y]} rotation={[0, -angle, 0]}>
-      <extrudeGeometry args={[shape, extrudeSettings]} />
-      <meshStandardMaterial color="#f8f8f8" side={THREE.DoubleSide} />
-    </mesh>
-  );
+  private allocateRoomAreas() {
+    const standards: Record<keyof GeneratePlanSchema['roomCounts'], number> = {
+      LivingRoom: 0.30,
+      Kitchen: 0.12,
+      Bedroom: 0.20,
+      Bathroom: 0.08,
+      DiningRoom: 0.10,
+    };
+
+    const roomAreas: { [key: string]: { id: string, type: string, area: number }[] } = {};
+    let allocatedArea = 0;
+    let totalRequestedArea = 0;
+    
+    // First pass: assign areas based on standards and minimums
+    for (const [roomType, count] of Object.entries(this.roomRequest)) {
+      if (count > 0) {
+        roomAreas[roomType as string] = [];
+        const minArea = this.getMinimumArea(roomType as keyof GeneratePlanSchema['roomCounts']);
+        const standardArea = this.totalAreaMeters * (standards[roomType as keyof GeneratePlanSchema['roomCounts']] || 0.1);
+        const areaPerRoom = Math.max(standardArea / count, minArea);
+        
+        for (let i = 0; i < count; i++) {
+          roomAreas[roomType as string].push({
+            id: `${roomType}-${i}`,
+            type: roomType,
+            area: areaPerRoom
+          });
+          totalRequestedArea += areaPerRoom;
+        }
+      }
+    }
+    
+    // Normalize if total requested area exceeds available area
+    if (totalRequestedArea > this.totalAreaMeters) {
+      const scaleFactor = this.totalAreaMeters / totalRequestedArea;
+      for (const roomType in roomAreas) {
+        roomAreas[roomType].forEach(room => room.area *= scaleFactor);
+      }
+    }
+    
+    return Object.values(roomAreas).flat();
+  }
+  
+  // Guillotine Algorithm for rectangle packing
+  private solveRectanglePacking(envelope: { width: number, depth: number }, roomsToPlace: { id: string, type: string, area: number }[]) {
+    const placedRooms: any[] = [];
+    let freeRects = [{ x: 0, y: 0, width: envelope.width, height: envelope.depth }];
+
+    // Sort rooms by area, descending. This is a greedy approach.
+    roomsToPlace.sort((a, b) => b.area - a.area);
+
+    for (const room of roomsToPlace) {
+      let bestFit: any = { score: Infinity };
+
+      for (let i = freeRects.length - 1; i >= 0; i--) {
+        const freeRect = freeRects[i];
+        
+        // Try to fit the room, testing different aspect ratios
+        const aspectRatios = [1, 1.5, 1/1.5, 2, 0.5]; // width/height
+        for(const ratio of aspectRatios){
+            const roomWidth = this.snapToGrid(Math.sqrt(room.area * ratio));
+            const roomHeight = this.snapToGrid(room.area / roomWidth);
+
+            if (roomWidth <= freeRect.width && roomHeight <= freeRect.height) {
+                const score = (freeRect.width * freeRect.height) - (roomWidth * roomHeight); // Simple score: smaller leftover area is better
+                if (score < bestFit.score) {
+                    bestFit = {
+                        score,
+                        x: freeRect.x,
+                        y: freeRect.y,
+                        width: roomWidth,
+                        height: roomHeight,
+                        rectIndex: i,
+                    };
+                }
+            }
+        }
+      }
+      
+      if (bestFit.score !== Infinity) {
+        const { x, y, width, height, rectIndex } = bestFit;
+        placedRooms.push({ ...room, x, y, width, height });
+
+        const freeRect = freeRects[rectIndex];
+        freeRects.splice(rectIndex, 1);
+
+        // Split the free rectangle (Guillotine cut)
+        const rightRect = { x: x + width, y, width: freeRect.width - width, height: freeRect.height };
+        if(rightRect.width > 0) freeRects.push(rightRect);
+
+        const bottomRect = { x, y: y + height, width, height: freeRect.height - height };
+        if(bottomRect.height > 0) freeRects.push(bottomRect);
+      }
+    }
+    return placedRooms;
+  }
+
+  generateLayout() {
+    // 1. Calculate building envelope
+    const circulationFactor = 1.25; // 25% for walls/hallways
+    const grossArea = this.totalAreaMeters * circulationFactor;
+    const aspectRatio = 1.5; // width:depth
+    const envelopeWidth = this.snapToGrid(Math.sqrt(grossArea * aspectRatio));
+    const envelopeDepth = this.snapToGrid(grossArea / envelopeWidth);
+    const envelope = { width: envelopeWidth, depth: envelopeDepth };
+    
+    // 2. Allocate room areas
+    const roomSpecs = this.allocateRoomAreas();
+    
+    // 3. Solve layout using rectangle packing
+    const layout = this.solveRectanglePacking(envelope, roomSpecs);
+
+    // 4. Place Doors and Windows
+    const finalLayout = this.placeOpenings(layout);
+
+    return { layout: finalLayout, envelope };
+  }
+
+  private placeOpenings(layout: any[]) {
+     layout.forEach(room => {
+      room.doors = [];
+      room.windows = [];
+
+      const wallSegments = {
+        north: [{ start: room.x, end: room.x + room.width }],
+        south: [{ start: room.x, end: room.x + room.width }],
+        east: [{ start: room.y, end: room.y + room.height }],
+        west: [{ start: room.y, end: room.y + room.height }],
+      };
+
+      // Find adjacencies and place doors
+      layout.forEach(other => {
+        if (room.id === other.id) return;
+        
+        // Simplified adjacency check for shared walls
+        const xOverlap = Math.max(0, Math.min(room.x + room.width, other.x + other.width) - Math.max(room.x, other.x));
+        const yOverlap = Math.max(0, Math.min(room.y + room.height, other.y + other.height) - Math.max(room.y, other.y));
+
+        if (Math.abs((room.y + room.height) - other.y) < 0.1 && xOverlap > DOOR_WIDTH) { // North wall of room shares with south wall of other
+          room.doors.push({ wall: 'north', pos: room.x + xOverlap / 2, connectsTo: other.id });
+        } else if (Math.abs(room.y - (other.y + other.height)) < 0.1 && xOverlap > DOOR_WIDTH) { // South wall
+          room.doors.push({ wall: 'south', pos: room.x + xOverlap / 2, connectsTo: other.id });
+        } else if (Math.abs((room.x + room.width) - other.x) < 0.1 && yOverlap > DOOR_WIDTH) { // East wall
+          room.doors.push({ wall: 'east', pos: room.y + yOverlap / 2, connectsTo: other.id });
+        } else if (Math.abs(room.x - (other.x + other.width)) < 0.1 && yOverlap > DOOR_WIDTH) { // West wall
+          room.doors.push({ wall: 'west', pos: room.y + yOverlap / 2, connectsTo: other.id });
+        }
+      });
+
+      // Place windows on exterior walls
+      Object.entries(wallSegments).forEach(([wall, segments]) => {
+          if (room.doors.every(d => d.wall !== wall) && segments[0].end - segments[0].start > WINDOW_WIDTH + 1) {
+              room.windows.push({ wall, pos: segments[0].start + (segments[0].end - segments[0].start) / 2 });
+          }
+      });
+    });
+    return layout;
+  }
 }
 
+// --- 3D GEOMETRY GENERATOR ---
 
-// --- PROCEDURAL LAYOUT LOGIC ---
+class MeshGenerator {
+  private getFloorMaterial(roomType: string) {
+    const colors: Record<string, THREE.ColorRepresentation> = {
+      LivingRoom: '#D2B48C', // Light wood
+      Bedroom: '#EADAC4', // Lighter wood
+      Kitchen: '#E0E0E0', // Light tile
+      Bathroom: '#CCCCCC', // Darker tile
+      DiningRoom: '#C8A97E', // Medium wood
+    };
+    return new THREE.MeshStandardMaterial({
+      color: colors[roomType] || '#F0F0F0',
+      roughness: 0.8,
+      metalness: 0.1,
+    });
+  }
 
-/**
- * 📐 Floor Plan Dimensions & JSON Room Layout
- * This data is generated procedurally based on user input.
- * Example structure:
-  const roomData = {
-    'LivingRoom-0': { x: 0, z: 0, width: 5, depth: 6, label: 'Living Room' },
-    'Bedroom-0': { x: 5, z: 0, width: 4, depth: 4, label: 'Bedroom' },
-    ...
-  };
-*/
-function generateLayout(planConfig: GeneratePlanSchema) {
-    const { totalArea, roomCounts } = planConfig;
-    const sideLength = Math.sqrt(totalArea);
+  private getWallMaterial() {
+    return new THREE.MeshStandardMaterial({
+      color: '#F5F5F5', // Off-white
+      roughness: 0.9,
+    });
+  }
+  
+  build(layout: any[]) {
+    const group = new THREE.Group();
 
-    const rooms: { [key: string]: any } = {};
-    const walls = new Set<string>(); // Use a set to avoid duplicate walls
-    
-    // A very simple greedy packing algorithm
-    let currentX = 0;
-    let currentZ = 0;
-    let maxZinRow = 0;
+    layout.forEach(room => {
+      // Floor
+      const floorGeom = new THREE.PlaneGeometry(room.width, room.height);
+      const floorMesh = new THREE.Mesh(floorGeom, this.getFloorMaterial(room.type));
+      floorMesh.rotation.x = -Math.PI / 2;
+      floorMesh.position.set(room.x + room.width / 2, 0, room.y + room.height / 2);
+      group.add(floorMesh);
 
-    const totalRooms = Object.values(roomCounts).reduce((a, b) => a + b, 0);
-    const avgRoomArea = totalArea / Math.max(1, totalRooms);
-    const estimatedRoomSide = Math.sqrt(avgRoomArea) * 0.9; // Adjust to add space for corridors
-
-    for (const [roomType, count] of Object.entries(roomCounts)) {
-        for (let i = 0; i < count; i++) {
-            const roomWidth = estimatedRoomSide + Math.random() * 2 - 1;
-            const roomDepth = estimatedRoomSide + Math.random() * 2 - 1;
-
-            if (currentX + roomWidth > sideLength) {
-                currentX = 0;
-                currentZ += maxZinRow;
-                maxZinRow = 0;
-            }
-            
-            if (currentZ + roomDepth > sideLength) continue; // Skip if it doesn't fit
-
-            const roomKey = `${roomType}-${i}`;
-            rooms[roomKey] = {
-                x: currentX,
-                z: currentZ,
-                width: roomWidth,
-                depth: roomDepth,
-                label: roomType.replace(/([A-Z])/g, ' $1').trim(),
-            };
-
-            currentX += roomWidth;
-            maxZinRow = Math.max(maxZinRow, roomDepth);
-        }
-    }
-
-    // Generate walls from room boundaries
-    Object.values(rooms).forEach(room => {
-        const { x, z, width, depth } = room;
-        const x0 = x, z0 = z, x1 = x + width, z1 = z + depth;
-        
-        // Use a key to uniquely identify wall segments
-        walls.add(`${x0},${z0},${x1},${z0}`); // Top
-        walls.add(`${x0},${z1},${x1},${z1}`); // Bottom
-        walls.add(`${x0},${z0},${x0},${z1}`); // Left
-        walls.add(`${x1},${z0},${x1},${z1}`); // Right
+      // Walls
+      const walls = this.createWallsWithOpenings(room);
+      walls.forEach(wall => group.add(wall));
     });
 
-    return { rooms, walls: Array.from(walls) };
+    return group;
+  }
+
+  private createWallsWithOpenings(room: any) {
+    const wallMeshes: THREE.Mesh[] = [];
+    const wallMaterial = this.getWallMaterial();
+
+    const openings = [
+        ...room.doors.map((d: any) => ({ ...d, type: 'door', width: DOOR_WIDTH, height: DOOR_HEIGHT, y: 0 })),
+        ...room.windows.map((w: any) => ({ ...w, type: 'window', width: WINDOW_WIDTH, height: WINDOW_HEIGHT, y: WINDOW_SILL_HEIGHT }))
+    ];
+
+    // North, South, East, West
+    const wallDefs = [
+      { side: 'north', p1: [room.x, room.y + room.height], p2: [room.x + room.width, room.y + room.height], normal: [0, 1] },
+      { side: 'south', p1: [room.x, room.y], p2: [room.x + room.width, room.y], normal: [0, -1] },
+      { side: 'east', p1: [room.x + room.width, room.y], p2: [room.x + room.width, room.y + room.height], normal: [1, 0] },
+      { side: 'west', p1: [room.x, room.y], p2: [room.x, room.y + room.height], normal: [-1, 0] },
+    ];
+    
+    wallDefs.forEach(def => {
+        const wallOpenings = openings.filter((o: any) => o.wall === def.side).sort((a:any, b:any) => a.pos - b.pos);
+        let currentPos = (def.side === 'north' || def.side === 'south') ? def.p1[0] : def.p1[1];
+        const wallEnd = (def.side === 'north' || def.side === 'south') ? def.p2[0] : def.p2[1];
+
+        // Wall before first opening
+        if (wallOpenings.length === 0 || wallOpenings[0].pos - wallOpenings[0].width/2 > currentPos) {
+             const end = wallOpenings.length > 0 ? wallOpenings[0].pos - wallOpenings[0].width/2 : wallEnd;
+             wallMeshes.push(this.createWallSegment(def.side, room, currentPos, end, wallMaterial));
+        }
+
+        // Segments between openings
+        wallOpenings.forEach((opening:any, i:number) => {
+            // Segment before this opening
+            const start = currentPos;
+            const end = opening.pos - opening.width/2;
+            if(end > start) wallMeshes.push(this.createWallSegment(def.side, room, start, end, wallMaterial));
+
+            // Segments for the opening (above and below)
+            wallMeshes.push(...this.createOpeningSegments(def.side, room, opening, wallMaterial));
+
+            currentPos = opening.pos + opening.width/2;
+
+            // Segment after last opening
+            if(i === wallOpenings.length - 1 && wallEnd > currentPos){
+                wallMeshes.push(this.createWallSegment(def.side, room, currentPos, wallEnd, wallMaterial));
+            }
+        });
+    });
+
+    return wallMeshes;
+  }
+  
+  private createWallSegment(side: string, room:any, start: number, end: number, material: THREE.Material) {
+      const length = end - start;
+      if (length <= 0) return new THREE.Mesh(); // Should not happen with correct logic
+      
+      let width, depth, posX, posZ;
+      const thickness = INTERIOR_WALL_THICKNESS;
+
+      if(side === 'north' || side === 'south') {
+          width = length; depth = thickness;
+          posX = start + length / 2;
+          posZ = (side === 'north') ? room.y + room.height - thickness / 2 : room.y + thickness/2;
+      } else { // east or west
+          width = thickness; depth = length;
+          posX = (side === 'east') ? room.x + room.width - thickness / 2 : room.x + thickness/2;
+          posZ = start + length/2;
+      }
+
+      const geom = new THREE.BoxGeometry(width, WALL_HEIGHT, depth);
+      const mesh = new THREE.Mesh(geom, material);
+      mesh.position.set(posX, WALL_HEIGHT / 2, posZ);
+      return mesh;
+  }
+
+  private createOpeningSegments(side: string, room: any, opening: any, material: THREE.Material) {
+      const segments = [];
+      const thickness = INTERIOR_WALL_THICKNESS;
+      
+      // Segment below (for windows)
+      if (opening.type === 'window' && opening.y > 0) {
+          let width = (side === 'north' || side === 'south') ? opening.width : thickness;
+          let depth = (side === 'east' || side === 'west') ? opening.width : thickness;
+          let posX = (side === 'north' || side === 'south') ? opening.pos : ((side === 'east') ? room.x + room.width - thickness / 2 : room.x + thickness/2);
+          let posZ = (side === 'north' || side === 'south') ? (side === 'north' ? room.y + room.height - thickness/2 : room.y + thickness/2) : opening.pos;
+
+          const geom = new THREE.BoxGeometry(width, opening.y, depth);
+          const mesh = new THREE.Mesh(geom, material);
+          mesh.position.set(posX, opening.y/2, posZ);
+          segments.push(mesh);
+      }
+
+      // Segment above
+      const topHeight = WALL_HEIGHT - (opening.y + opening.height);
+       if (topHeight > 0) {
+          let width = (side === 'north' || side === 'south') ? opening.width : thickness;
+          let depth = (side === 'east' || side === 'west') ? opening.width : thickness;
+          let posX = (side === 'north' || side === 'south') ? opening.pos : ((side === 'east') ? room.x + room.width - thickness / 2 : room.x + thickness/2);
+          let posZ = (side === 'north' || side === 'south') ? (side === 'north' ? room.y + room.height - thickness/2 : room.y + thickness/2) : opening.pos;
+          
+          const geom = new THREE.BoxGeometry(width, topHeight, depth);
+          const mesh = new THREE.Mesh(geom, material);
+          mesh.position.set(posX, (opening.y + opening.height) + topHeight/2, posZ);
+          segments.push(mesh);
+      }
+
+      return segments;
+  }
 }
 
 
 // --- MAIN 3D COMPONENT ---
 
-const FloorPlan = ({ planConfig, onSceneReady }: { planConfig: GeneratePlanSchema, onSceneReady: (scene: THREE.Scene) => void; }) => {
+const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: GeneratePlanSchema, onSceneReady: (scene: THREE.Scene) => void; }) => {
   const { scene } = useThree();
-  const { rooms, walls } = React.useMemo(() => generateLayout(planConfig), [planConfig]);
-  const sideLength = Math.sqrt(planConfig.totalArea);
+
+  const generatedModel = React.useMemo(() => {
+    try {
+      const layoutGenerator = new AdvancedLayoutGenerator(planConfig);
+      const { layout, envelope } = layoutGenerator.generateLayout();
+      
+      if (!layout || layout.length === 0) {
+        console.error("Layout generation failed to produce any rooms.");
+        return { model: new THREE.Group(), envelope: { width: 10, depth: 10 } };
+      }
+
+      const meshGenerator = new MeshGenerator();
+      const model = meshGenerator.build(layout);
+      
+      // Center the model
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+      
+      return { model, envelope };
+
+    } catch (error) {
+      console.error("Error during 3D model generation:", error);
+      return { model: new THREE.Group(), envelope: { width: 10, depth: 10 } }; // Return empty group on error
+    }
+  }, [planConfig]);
 
   React.useEffect(() => {
-    onSceneReady(scene);
-  }, [scene, onSceneReady]);
+    // Add the generated model to the scene
+    const group = new THREE.Group();
+    group.add(generatedModel.model);
+    
+    // Pass a clone to avoid issues with React Three Fiber's scene management
+    onSceneReady(group.clone());
+
+    // This is for local display in the canvas
+    scene.add(generatedModel.model);
+    return () => {
+      scene.remove(generatedModel.model);
+    };
+  }, [generatedModel, scene, onSceneReady]);
+
 
   return (
-    <group position={[-sideLength / 2, 0, -sideLength / 2]}>
-      {/* Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[sideLength/2, 0, sideLength/2]}>
-        <planeGeometry args={[sideLength, sideLength]} />
-        <meshStandardMaterial color="#d2b48c" />
-      </mesh>
-
-      {/* Walls */}
-      {walls.map((wall, index) => {
-        const [x1_s, y1_s, x2_s, y2_s] = wall.split(',');
-        const start = new THREE.Vector3(parseFloat(x1_s), parseFloat(y1_s), 0);
-        const end = new THREE.Vector3(parseFloat(x2_s), parseFloat(y2_s), 0);
-        
-        // Simple logic to add a door to one wall segment
-        const isExterior = parseFloat(x1_s) === 0 || parseFloat(x2_s) === 0;
-        const openings = [];
-        if (index === 3 && isExterior) { // Add a door to an arbitrary exterior wall
-             openings.push({
-                position: [start.distanceTo(end) / 2 - 0.45, 0],
-                size: [0.9, 2.1] // 0.9m wide, 2.1m high
-            });
-        }
-        if(index % 5 === 0 && isExterior) { // Add a window to some exterior walls
-            openings.push({
-                position: [start.distanceTo(end) / 2 - 0.6, 0.9],
-                size: [1.2, 1.2] // 1.2m wide, 1.2m high
-            });
-        }
-
-        return <Wall key={index} start={start} end={end} openings={openings} />;
-      })}
-
+    <>
       {/* Room Labels */}
-      {Object.values(rooms).map((room, index) => (
-         <Text
-            key={index}
-            position={[room.x + room.width / 2, 1.5, room.z + room.depth / 2]}
-            fontSize={0.5}
-            color="black"
-            anchorX="center"
-            anchorY="middle"
-            maxWidth={room.width}
-        >
-            {room.label}
-        </Text>
-      ))}
-    </group>
+      {generatedModel.model.children.map(floor => {
+        if(floor.userData.type === 'floor') {
+          const room = (planConfig as any).layout?.find((r:any) => r.id === floor.userData.roomId);
+          const label = room ? room.type.replace(/([A-Z])/g, ' $1').trim() : '';
+          return (
+             <Text
+                key={floor.uuid}
+                position={[floor.position.x, 1.5, floor.position.z]}
+                fontSize={0.5}
+                color="black"
+                anchorX="center"
+                anchorY="middle"
+            >
+                {label}
+            </Text>
+          )
+        }
+        return null;
+      })}
+    </>
   );
-};
+});
 
+FloorPlan.displayName = 'FloorPlan';
 
 interface InteractiveViewerProps {
   planConfig: GeneratePlanSchema;
@@ -199,20 +444,27 @@ interface InteractiveViewerProps {
 }
 
 export function InteractiveViewer({ planConfig, regenerationKey, onSceneReady }: InteractiveViewerProps) {
-  const totalArea = planConfig.totalArea;
-  const cameraDistance = Math.sqrt(totalArea) * 1.5;
+  const totalArea = (planConfig.totalArea ?? 1200) * SQFT_TO_SQM;
+  const cameraDistance = Math.sqrt(totalArea) * 1.8;
 
   return (
     <Canvas
-      camera={{ position: [0, cameraDistance, cameraDistance], fov: 50 }}
+      camera={{ position: [0, cameraDistance, cameraDistance * 0.8], fov: 50 }}
       shadows
       style={{ background: 'hsl(var(--background))' }}
     >
-      <ambientLight intensity={0.8} />
+      <ambientLight intensity={1.2} />
       <directionalLight 
-        position={[10, 20, 5]} 
-        intensity={1.0} 
+        position={[15, 25, 10]} 
+        intensity={1.5} 
         castShadow 
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={100}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
       />
       
       <React.Suspense fallback={null}>
@@ -221,9 +473,9 @@ export function InteractiveViewer({ planConfig, regenerationKey, onSceneReady }:
       
       <OrbitControls 
         makeDefault 
-        minDistance={2} 
+        minDistance={5} 
         maxDistance={50}
-        maxPolarAngle={Math.PI / 2.1}
+        maxPolarAngle={Math.PI / 2.05} // Prevent looking from below
       />
       <gridHelper args={[100, 100]} position={[0, -0.01, 0]} />
     </Canvas>

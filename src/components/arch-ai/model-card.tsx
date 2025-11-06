@@ -3,6 +3,7 @@
 import * as React from "react";
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import * as THREE from 'three';
+import create from 'zustand';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,15 @@ import { Download, RefreshCw, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { InteractiveViewer } from "./interactive-viewer";
 import type { GeneratePlanSchema } from "@/lib/schemas";
+
+// Zustand store to manage the scene, making it accessible to the exporter
+const useSceneStore = create<{
+  scene: THREE.Scene | null;
+  setScene: (scene: THREE.Scene) => void;
+}>((set) => ({
+  scene: null,
+  setScene: (scene) => set({ scene }),
+}));
 
 
 interface ModelCardProps {
@@ -21,10 +31,12 @@ interface ModelCardProps {
 export function ModelCard({ title, description, planConfig }: ModelCardProps) {
   const { toast } = useToast();
   const [regenerationKey, setRegenerationKey] = React.useState(0);
-  const sceneRef = React.useRef<THREE.Scene | null>(null);
+  
+  // Use the zustand store
+  const { scene, setScene } = useSceneStore();
 
   const handleDownload = () => {
-    if (!sceneRef.current) {
+    if (!scene) {
        toast({
         variant: "destructive",
         title: "Download Failed",
@@ -35,7 +47,7 @@ export function ModelCard({ title, description, planConfig }: ModelCardProps) {
 
     const exporter = new GLTFExporter();
     exporter.parse(
-      sceneRef.current,
+      scene,
       (gltf) => {
         const blob = new Blob([JSON.stringify(gltf)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -59,7 +71,8 @@ export function ModelCard({ title, description, planConfig }: ModelCardProps) {
           description: "An error occurred while exporting the model.",
         });
         console.error('An error occurred during GLTF export:', error);
-      }
+      },
+      { binary: false }
     );
   };
 
@@ -91,7 +104,7 @@ export function ModelCard({ title, description, planConfig }: ModelCardProps) {
             <InteractiveViewer 
               planConfig={planConfig} 
               regenerationKey={regenerationKey}
-              onSceneReady={(scene) => sceneRef.current = scene}
+              onSceneReady={setScene} // Pass the setter function to the viewer
             />
           ) : (
              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
