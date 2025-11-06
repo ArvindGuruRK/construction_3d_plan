@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -214,11 +215,11 @@ class AdvancedLayoutGenerator {
 class MeshGenerator {
   private getFloorMaterial(roomType: string) {
     const colors: Record<string, THREE.ColorRepresentation> = {
-      LivingRoom: '#D2B48C', // Light wood
-      Bedroom: '#EADAC4', // Lighter wood
-      Kitchen: '#E0E0E0', // Light tile
-      Bathroom: '#CCCCCC', // Darker tile
-      DiningRoom: '#C8A97E', // Medium wood
+      LivingRoom: '#D2B48C', // Tan - Wood
+      Bedroom: '#EADAC4', // Beige - Carpet/Light Wood
+      Kitchen: '#BFC0C0', // Silver - Tile
+      Bathroom: '#A2A2A2', // Gray - Darker Tile
+      DiningRoom: '#C8A97E', // Bisque - Medium Wood
     };
     return new THREE.MeshStandardMaterial({
       color: colors[roomType] || '#F0F0F0',
@@ -243,6 +244,7 @@ class MeshGenerator {
       const floorMesh = new THREE.Mesh(floorGeom, this.getFloorMaterial(room.type));
       floorMesh.rotation.x = -Math.PI / 2;
       floorMesh.position.set(room.x + room.width / 2, 0, room.y + room.height / 2);
+      floorMesh.userData = { type: 'floor', room }; // Attach room data
       group.add(floorMesh);
 
       // Walls
@@ -367,14 +369,14 @@ class MeshGenerator {
 const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: GeneratePlanSchema, onSceneReady: (scene: THREE.Scene) => void; }) => {
   const { scene } = useThree();
 
-  const generatedModel = React.useMemo(() => {
+  const { model: generatedModel, layout } = React.useMemo(() => {
     try {
       const layoutGenerator = new AdvancedLayoutGenerator(planConfig);
       const { layout, envelope } = layoutGenerator.generateLayout();
       
       if (!layout || layout.length === 0) {
         console.error("Layout generation failed to produce any rooms.");
-        return { model: new THREE.Group(), envelope: { width: 10, depth: 10 } };
+        return { model: new THREE.Group(), layout: [], envelope: { width: 10, depth: 10 } };
       }
 
       const meshGenerator = new MeshGenerator();
@@ -385,26 +387,26 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
       const center = box.getCenter(new THREE.Vector3());
       model.position.sub(center);
       
-      return { model, envelope };
+      return { model, layout, envelope };
 
     } catch (error) {
       console.error("Error during 3D model generation:", error);
-      return { model: new THREE.Group(), envelope: { width: 10, depth: 10 } }; // Return empty group on error
+      return { model: new THREE.Group(), layout: [], envelope: { width: 10, depth: 10 } }; // Return empty group on error
     }
   }, [planConfig]);
 
   React.useEffect(() => {
     // Add the generated model to the scene
     const group = new THREE.Group();
-    group.add(generatedModel.model);
+    group.add(generatedModel);
     
     // Pass a clone to avoid issues with React Three Fiber's scene management
     onSceneReady(group.clone());
 
     // This is for local display in the canvas
-    scene.add(generatedModel.model);
+    scene.add(generatedModel);
     return () => {
-      scene.remove(generatedModel.model);
+      scene.remove(generatedModel);
     };
   }, [generatedModel, scene, onSceneReady]);
 
@@ -412,24 +414,25 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
   return (
     <>
       {/* Room Labels */}
-      {generatedModel.model.children.map(floor => {
-        if(floor.userData.type === 'floor') {
-          const room = (planConfig as any).layout?.find((r:any) => r.id === floor.userData.roomId);
-          const label = room ? room.type.replace(/([A-Z])/g, ' $1').trim() : '';
-          return (
-             <Text
-                key={floor.uuid}
-                position={[floor.position.x, 1.5, floor.position.z]}
-                fontSize={0.5}
-                color="black"
-                anchorX="center"
-                anchorY="middle"
-            >
-                {label}
-            </Text>
-          )
-        }
-        return null;
+      {layout.map((room: any) => {
+        const label = room.type.replace(/([A-Z])/g, ' $1').trim();
+        // Get model center to offset label position
+        const box = new THREE.Box3().setFromObject(generatedModel);
+        const center = box.getCenter(new THREE.Vector3());
+
+        return (
+            <Text
+            key={room.id}
+            position={[room.x + room.width / 2 - center.x, 1.5, room.y + room.height / 2 - center.z]}
+            fontSize={0.4}
+            color="#333333"
+            anchorX="center"
+            anchorY="middle"
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            {label}
+          </Text>
+        )
       })}
     </>
   );
@@ -481,3 +484,4 @@ export function InteractiveViewer({ planConfig, regenerationKey, onSceneReady }:
     </Canvas>
   );
 }
+
