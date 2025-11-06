@@ -387,6 +387,9 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
       const center = box.getCenter(new THREE.Vector3());
       model.position.sub(center);
       
+      // Elevate the model slightly above the grid
+      model.position.y += 0.05;
+      
       return { model, layout, centerOffset: center };
 
     } catch (error) {
@@ -416,13 +419,18 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
       {/* Room Labels */}
       {layout.map((room: any) => {
         const label = room.type.replace(/([A-Z])/g, ' $1').trim();
+        
+        // Calculate the label's absolute position, then apply the centering offset.
         const labelPosition = new THREE.Vector3(
             room.x + room.width / 2,
-            1.5,
+            WALL_HEIGHT, // Position labels at ceiling height
             room.y + room.height / 2
         );
         labelPosition.sub(centerOffset);
         
+        // Apply the same elevation as the model itself
+        labelPosition.y += 0.05;
+
         return (
             <Text
             key={room.id}
