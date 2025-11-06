@@ -63,6 +63,17 @@ The application provides a seamless experience for generating architectural desi
 4.  **Mock Data**: While the AI generation is being simulated, the application currently returns a set of predefined placeholder images to display as results.
 5.  **Display Results**: The generated variations are displayed in the main viewing area as interactive cards.
 
+## Deployment to Netlify
+
+You can deploy this application to Netlify by following these steps:
+
+1.  **Push to Git**: Make sure your project code is in a GitHub, GitLab, or Bitbucket repository.
+2.  **Create a New Site**: Log in to your Netlify account and click the "Add new site" or "Import from Git" button.
+3.  **Connect Repository**: Choose your Git provider and select the repository for this project.
+4.  **Configure Build Settings**: Netlify will automatically detect the `netlify.toml` file in your project and use the correct build command (`npm run build`) and publish directory (`.next`).
+5.  **Add Environment Variables**: Before deploying, go to **Site configuration > Environment variables** and add your `GEMINI_API_KEY`. This is crucial for the AI features to work in production.
+6.  **Deploy**: Click "Deploy site." Netlify will start the build process and deploy your application.
+
 ## Architecture and Routing
 
 This application uses the Next.js App Router. Communication between the frontend and backend logic is handled primarily through **Next.js Server Actions**, which eliminates the need for traditional API routes.
