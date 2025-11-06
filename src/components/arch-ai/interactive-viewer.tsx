@@ -388,7 +388,7 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
       model.position.sub(center);
       
       // Elevate the model above the grid
-      model.position.y += 1;
+      model.position.y += 1.5;
       
       return { model, layout, centerOffset: center };
 
@@ -429,7 +429,7 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
         labelPosition.sub(centerOffset);
         
         // Apply the same elevation as the model itself
-        labelPosition.y += 1;
+        labelPosition.y += 1.5;
 
         return (
             <Text
