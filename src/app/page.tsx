@@ -14,6 +14,7 @@ import { ViewerGrid } from "@/components/arch-ai/viewer-grid";
 import { Logo } from "@/components/arch-ai/icons";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { AiGeneratorDialog } from "@/components/arch-ai/ai-generator-dialog";
 
 export default function Home() {
   const [isLoading, setIsLoading] = React.useState(false);
@@ -85,8 +86,11 @@ export default function Home() {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <main className="flex-1">
+        <main className="flex-1 relative">
           <ViewerGrid isLoading={isLoading} result={result} formData={formData} />
+          <div className="absolute bottom-6 right-6">
+            <AiGeneratorDialog />
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>
