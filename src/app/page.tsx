@@ -26,6 +26,7 @@ export default function Home() {
   const form = useForm<GeneratePlanSchema>({
     resolver: zodResolver(generatePlanSchema),
     defaultValues: {
+      totalArea: 1200,
       roomCounts: {
         Bedroom: 2,
         Bathroom: 2,
@@ -33,19 +34,23 @@ export default function Home() {
         LivingRoom: 1,
         DiningRoom: 0,
       },
+      roomSqft: {
+        Bedroom: 150,
+        Bathroom: 60,
+        Kitchen: 100,
+        LivingRoom: 250,
+        DiningRoom: 120,
+      }
     },
   });
 
   const onSubmit = async (data: GeneratePlanSchema) => {
     setIsLoading(true);
     setResult(null);
-    
-    // Hardcode totalArea since the slider is removed
-    const dataWithArea = { ...data, totalArea: 1200 };
-    setFormData(dataWithArea);
+    setFormData(data);
 
     try {
-      const response = await getPlanVariations(dataWithArea);
+      const response = await getPlanVariations(data);
       if (response.success && response.data) {
         // We are now only focused on a single variation
         setResult(response.data[0]);
