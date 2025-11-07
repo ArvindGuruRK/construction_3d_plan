@@ -386,8 +386,13 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
     <>
       {/* Room Labels */}
       {layout.map((room: any) => {
-        const label = room.type.replace(/([A-Z])/g, ' $1').trim();
+        const name = room.type.replace(/([A-Z])/g, ' $1').trim();
+        const widthFt = Math.round(room.width * METER_TO_FEET);
+        const depthFt = Math.round(room.height * METER_TO_FEET);
+        const areaSqft = Math.round(widthFt * depthFt);
         
+        const label = `${name}\n${widthFt}' x ${depthFt}'\n~${areaSqft} sqft`;
+
         // Calculate the label's absolute position, then apply the centering offset.
         const labelPosition = new THREE.Vector3(
             room.x + room.width / 2,
@@ -403,11 +408,13 @@ const FloorPlan = React.memo(({ planConfig, onSceneReady }: { planConfig: Genera
             <Text
             key={room.id}
             position={labelPosition}
-            fontSize={0.4}
+            fontSize={0.3}
             color="#333333"
             anchorX="center"
             anchorY="middle"
             rotation={[-Math.PI / 2, 0, 0]}
+            textAlign="center"
+            lineHeight={1.2}
           >
             {label}
           </Text>
