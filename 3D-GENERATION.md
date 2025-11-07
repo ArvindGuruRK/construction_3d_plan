@@ -20,7 +20,7 @@ ArchAI 3D is a web application designed to bridge the gap between high-level arc
 The project leverages a modern, powerful tech stack centered around Next.js and its ecosystem.
 
 - **Framework**: **Next.js 15 (App Router)** - Provides the foundation for the application, handling routing, server-side rendering, and client-side navigation.
-- **UI Library**: **React 18** - Used for building the user interface with a component-based architecture.
+- **UI Library**: **React 19** - Used for building the user interface with a component-based architecture.
 - **3D Rendering**:
     - **React Three Fiber (R3F)**: A React renderer for Three.js, enabling a declarative, component-based approach to building complex 3D scenes.
     - **Three.js**: The underlying WebGL library for creating and displaying 3D graphics in the browser.
