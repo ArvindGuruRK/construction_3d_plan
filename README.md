@@ -1,6 +1,6 @@
-# ArchAI 3D
+# Construction 3D
 
-Welcome to ArchAI 3D, a procedural 3D floor plan generation tool. This application allows you to configure various parameters for a floor plan and generate multiple 3D variations directly in your browser.
+Welcome to Construction 3D, a procedural 3D floor plan generation tool. This application allows you to configure various parameters for a floor plan and generate multiple 3D variations directly in your browser.
 
 ## Tech Stack
 

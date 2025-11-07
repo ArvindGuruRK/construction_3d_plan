@@ -1,10 +1,10 @@
-# ArchAI 3D: In-Depth Project Documentation
+# Construction 3D: In-Depth Project Documentation
 
-Welcome to the comprehensive documentation for **ArchAI 3D**, an AI-powered architectural design tool. This document provides a deep dive into the project's architecture, data flow, component structure, and underlying technologies.
+Welcome to the comprehensive documentation for **Construction 3D**, an AI-powered architectural design tool. This document provides a deep dive into the project's architecture, data flow, component structure, and underlying technologies.
 
 ## 1. Project Vision & Core Features
 
-ArchAI 3D is a web application designed to bridge the gap between high-level architectural requirements and tangible 3D visualizations. It allows users to input desired specifications for a floor plan and, in response, receive multiple procedurally generated, interactive 3D models.
+Construction 3D is a web application designed to bridge the gap between high-level architectural requirements and tangible 3D visualizations. It allows users to input desired specifications for a floor plan and, in response, receive multiple procedurally generated, interactive 3D models.
 
 ### Key Features:
 - **Intuitive Configuration**: A simple sidebar panel allows users to define the total area and the number of various rooms (bedrooms, bathrooms, etc.).
@@ -197,4 +197,4 @@ This component acts as a container for each generated 3D model variation.
 
 ---
 
-This detailed breakdown should provide a solid foundation for understanding the ArchAI 3D project. The client-side procedural generation approach is powerful and provides a fantastic user experience, and the component-based architecture makes it highly maintainable and extensible.
+This detailed breakdown should provide a solid foundation for understanding the Construction 3D project. The client-side procedural generation approach is powerful and provides a fantastic user experience, and the component-based architecture makes it highly maintainable and extensible.

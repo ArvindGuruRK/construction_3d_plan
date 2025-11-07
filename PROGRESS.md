@@ -1,6 +1,6 @@
-# ArchAI 3D: Implementation Progress
+# Construction 3D: Implementation Progress
 
-This document outlines the features that have been implemented in the ArchAI 3D application based on the original project requirements.
+This document outlines the features that have been implemented in the Construction 3D application based on the original project requirements.
 
 ## Implemented Features
 
