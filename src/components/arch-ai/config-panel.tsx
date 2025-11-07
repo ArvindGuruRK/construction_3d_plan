@@ -25,6 +25,8 @@ const roomTypes: (keyof GeneratePlanSchema["roomCounts"])[] = [
 ];
 
 export function ConfigPanel({ form, onSubmit, isLoading }: ConfigPanelProps) {
+  const roomCounts = form.watch("roomCounts");
+
   return (
     <ScrollArea className="h-full">
       <Form {...form}>
@@ -77,27 +79,29 @@ export function ConfigPanel({ form, onSubmit, isLoading }: ConfigPanelProps) {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name={`roomSqft.${room}`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <FormLabel>Avg. Size</FormLabel>
-                          <span>{field.value} sqft</span>
-                        </div>
-                        <FormControl>
-                          <Slider
-                            value={[field.value]}
-                            onValueChange={(value) => field.onChange(value[0])}
-                            min={generatePlanSchema.shape.roomSqft.shape[room]._def.checks.find(c => c.kind === 'min')?.value}
-                            max={generatePlanSchema.shape.roomSqft.shape[room]._def.checks.find(c => c.kind === 'max')?.value}
-                            step={10}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  {roomCounts[room] > 0 && (
+                    <FormField
+                      control={form.control}
+                      name={`roomSqft.${room}`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <FormLabel>Avg. Size</FormLabel>
+                            <span>{field.value} sqft</span>
+                          </div>
+                          <FormControl>
+                            <Slider
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                              min={generatePlanSchema.shape.roomSqft.shape[room]._def.checks.find(c => c.kind === 'min')?.value}
+                              max={generatePlanSchema.shape.roomSqft.shape[room]._def.checks.find(c => c.kind === 'max')?.value}
+                              step={10}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               ))}
             </div>
