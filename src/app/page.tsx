@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -28,10 +29,10 @@ export default function Home() {
     defaultValues: {
       totalArea: 1200,
       roomCounts: {
-        Bedroom: 2,
-        Bathroom: 2,
-        Kitchen: 1,
-        LivingRoom: 1,
+        Bedroom: 0,
+        Bathroom: 0,
+        Kitchen: 0,
+        LivingRoom: 0,
         DiningRoom: 0,
       },
       roomSqft: {
