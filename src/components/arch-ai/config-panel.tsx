@@ -17,10 +17,10 @@ interface ConfigPanelProps {
 }
 
 const roomTypes: (keyof GeneratePlanSchema["roomCounts"])[] = [
+  "LivingRoom",
   "Bedroom",
   "Bathroom",
   "Kitchen",
-  "LivingRoom",
   "DiningRoom",
 ];
 
